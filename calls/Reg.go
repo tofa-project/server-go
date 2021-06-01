@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 
+	tofa_errors "github.com/tofa-project/server-go/errors"
 	uri_handler "github.com/tofa-project/server-go/uri-handler"
 )
 
@@ -33,13 +34,13 @@ func Reg(uri string, meta Meta) (string, error) {
 	// make json
 	metaJBytes, err := json.Marshal(meta)
 	if err != nil {
-		return "", fmt.Errorf("Invalid meta! %s", err)
+		return "", fmt.Errorf("invalid meta! %s", err)
 	}
 
 	// make request
-	req, err := http.NewRequest("REG", dec.ToHttp(), bytes.NewBuffer(metaJBytes))
+	req, err := http.NewRequest("REG", dec.ToUrl(), bytes.NewBuffer(metaJBytes))
 	if err != nil {
-		return "", fmt.Errorf("Could not create request! %s", err)
+		return "", fmt.Errorf("could not create request! %s", err)
 	}
 
 	timeoutChan := make(chan bool)
@@ -53,33 +54,27 @@ func Reg(uri string, meta Meta) (string, error) {
 	select {
 
 	case <-timeoutChan:
-		return "", fmt.Errorf("Request timed out!")
+		return "", &tofa_errors.CallTimedOut{}
 
 	case res := <-resChan:
 		defer res.Body.Close()
 
 		// parse based on received code
-		switch res.StatusCode {
-
-		case 270:
+		if res.StatusCode == 270 {
 			resByte, err := ioutil.ReadAll(res.Body)
 			if err != nil {
-				return "", fmt.Errorf("Could not parse response! %s", err)
+				return "", &tofa_errors.RequestFailed{}
 			}
 
 			resJson := make(Meta)
 			err = json.Unmarshal(resByte, &resJson)
 			if err != nil {
-				return "", fmt.Errorf("Could not parse response! %s", err)
+				return "", &tofa_errors.RequestFailed{}
 			}
 
 			return resJson["auth_token"], nil
-
-		case 570:
-			return "", fmt.Errorf("Client denied request!")
-
-		default:
-			return "", fmt.Errorf("Received code: %d expected 270 || 570", res.StatusCode)
+		} else {
+			return "", tofa_errors.GetErrorByCode(res.StatusCode)
 		}
 
 	case err := <-resErrChan:

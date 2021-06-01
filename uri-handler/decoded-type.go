@@ -20,8 +20,8 @@ type Decoded struct {
 	Version uint
 }
 
-// Converts to http address
-func (d *Decoded) ToHttp() string {
+// Converts to http url
+func (d *Decoded) ToUrl() string {
 	return strings.Join([]string{
 		"http://", d.Onion, ".onion:", strconv.Itoa(d.Port), "/", d.Path,
 	}, "")

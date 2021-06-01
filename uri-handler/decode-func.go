@@ -2,25 +2,26 @@ package uri_handler
 
 import (
 	"encoding/base64"
-	"fmt"
 	"strconv"
 	"strings"
+
+	tofa_errors "github.com/tofa-project/server-go/errors"
 )
 
 // decodes uri of type version 0
 func decodeVersion0(splUri []string) (*Decoded, error) {
 	if len(splUri) != 3 {
-		return nil, fmt.Errorf("Invalid URI!")
+		return nil, &tofa_errors.BadURI{"splUri"}
 	}
 
 	splPortPath := strings.Split(splUri[2], "/")
 	if len(splPortPath) < 2 {
-		return nil, fmt.Errorf("Invalid URI!")
+		return nil, &tofa_errors.BadURI{"splPortPath"}
 	}
 
 	portInt, err := strconv.Atoi(splPortPath[0])
 	if err != nil {
-		return nil, fmt.Errorf("Invalid URI! %s", err)
+		return nil, &tofa_errors.BadURI{"portInt"}
 	}
 
 	return &Decoded{
@@ -37,7 +38,7 @@ func Decode(iUri string) (*Decoded, error) {
 	// decode b64
 	decUriBytes, err := base64.StdEncoding.DecodeString(iUri)
 	if err != nil {
-		return nil, fmt.Errorf("Invalid URI! %s", err)
+		return nil, &tofa_errors.BadURI{"decUriBytes"}
 	}
 
 	// conver to string
@@ -46,7 +47,7 @@ func Decode(iUri string) (*Decoded, error) {
 	// split uri string and check if it's valid
 	decUriSpl := strings.Split(decUriStr, ":")
 	if len(decUriSpl) < 2 {
-		return nil, fmt.Errorf("Invalid URI!")
+		return nil, &tofa_errors.BadURI{"decUriSplt"}
 	}
 
 	// decode based on version
@@ -54,7 +55,7 @@ func Decode(iUri string) (*Decoded, error) {
 	case "0":
 		return decodeVersion0(decUriSpl)
 	default:
-		return nil, fmt.Errorf("Unsupported URI version!")
+		return nil, &tofa_errors.UnsupportedURI{"unsupported URI version " + decUriSpl[0]}
 	}
 
 }

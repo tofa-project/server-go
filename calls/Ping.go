@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
+	tofa_errors "github.com/tofa-project/server-go/errors"
 	uri_handler "github.com/tofa-project/server-go/uri-handler"
 )
 
@@ -17,9 +18,9 @@ func Ping(uri string) error {
 		return err
 	}
 
-	req, err := http.NewRequest("PING", dec.ToHttp(), nil)
+	req, err := http.NewRequest("PING", dec.ToUrl(), nil)
 	if err != nil {
-		return fmt.Errorf("Could not create request! %s", err)
+		return fmt.Errorf("could not create request! %s", err)
 	}
 
 	timeoutChan := make(chan bool)
@@ -32,20 +33,15 @@ func Ping(uri string) error {
 	select {
 
 	case <-timeoutChan:
-		return fmt.Errorf("Request timed out!")
+		return &tofa_errors.ConnectTimedOut{}
 
 	case res := <-resChan:
 		defer res.Body.Close()
 
-		// parse based on received code
-		switch res.StatusCode {
-
-		case http.StatusNoContent:
+		if res.StatusCode == http.StatusNoContent {
 			return nil
-
-		default:
-			return fmt.Errorf("Received code: %d, expected %d", res.StatusCode, http.StatusNoContent)
-
+		} else {
+			return tofa_errors.GetErrorByCode(res.StatusCode)
 		}
 
 	case e := <-resErrChan:

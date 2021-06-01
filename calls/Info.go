@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 
+	tofa_errors "github.com/tofa-project/server-go/errors"
 	uri_handler "github.com/tofa-project/server-go/uri-handler"
 )
 
@@ -29,13 +30,13 @@ func Info(uri string, meta Meta) error {
 	// make json
 	metaJBytes, err := json.Marshal(Meta{"description": meta["description"]})
 	if err != nil {
-		return fmt.Errorf("Invalid meta! %s", err)
+		return fmt.Errorf("invalid meta! %s", err)
 	}
 
 	// make request
-	req, err := http.NewRequest("INFO", dec.ToHttp(), bytes.NewBuffer(metaJBytes))
+	req, err := http.NewRequest("INFO", dec.ToUrl(), bytes.NewBuffer(metaJBytes))
 	if err != nil {
-		return fmt.Errorf("Could not create request! %s", err)
+		return fmt.Errorf("could not create request! %s", err)
 	}
 	req.Header.Add("Authorization", "Bearer "+meta["auth_token"])
 
@@ -50,18 +51,15 @@ func Info(uri string, meta Meta) error {
 	select {
 
 	case <-timeoutChan:
-		return fmt.Errorf("Request timed out!")
+		return &tofa_errors.CallTimedOut{}
 
 	case res := <-resChan:
 		defer res.Body.Close()
 
-		// parse based on received code
-		switch res.StatusCode {
-		case 200:
+		if res.StatusCode == 200 {
 			return nil
-
-		default:
-			return fmt.Errorf("Received code: %d, expected 200", res.StatusCode)
+		} else {
+			return tofa_errors.GetErrorByCode(res.StatusCode)
 		}
 
 	case e := <-resErrChan:

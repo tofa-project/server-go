@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 
+	tofa_errors "github.com/tofa-project/server-go/errors"
 	uri_handler "github.com/tofa-project/server-go/uri-handler"
 )
 
@@ -30,13 +31,13 @@ func Ask(uri string, meta Meta) (bool, error) {
 	// make json to send
 	metaJBytes, err := json.Marshal(Meta{"description": meta["description"]})
 	if err != nil {
-		return false, fmt.Errorf("Invalid meta! %s", err)
+		return false, fmt.Errorf("invalid meta! %s", err)
 	}
 
 	// crate request
-	req, err := http.NewRequest("ASK", dec.ToHttp(), bytes.NewBuffer(metaJBytes))
+	req, err := http.NewRequest("ASK", dec.ToUrl(), bytes.NewBuffer(metaJBytes))
 	if err != nil {
-		return false, fmt.Errorf("Could not create request! %s", err)
+		return false, fmt.Errorf("could not create request! %s", err)
 	}
 	req.Header.Add("Authorization", "Bearer "+meta["auth_token"])
 
@@ -51,25 +52,18 @@ func Ask(uri string, meta Meta) (bool, error) {
 	select {
 
 	case <-timeoutChan:
-		return false, fmt.Errorf("Request timed out!")
+		return false, &tofa_errors.CallTimedOut{}
 
 	case res := <-resChan:
 		defer res.Body.Close()
 
-		// parse based on received code
-		switch res.StatusCode {
-		case 270:
+		if res.StatusCode == 270 {
 			return true, nil
-
-		case 570:
-			return false, nil
-
-		default:
-			return false, fmt.Errorf("Received code: %d, expected 270 || 570", res.StatusCode)
+		} else {
+			return false, tofa_errors.GetErrorByCode(res.StatusCode)
 		}
 
 	case e := <-resErrChan:
 		return false, e
 	}
-
 }
